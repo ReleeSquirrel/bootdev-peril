@@ -2,6 +2,7 @@ import amqp from "amqplib";
 import { publishJSON } from "../internal/pubsub/publishJSON.js";
 import { ExchangePerilDirect, PauseKey } from "../internal/routing/routing.js";
 import type { PlayingState } from "../internal/gamelogic/gamestate.js";
+import { getInput, printServerHelp } from "../internal/gamelogic/gamelogic.js";
 
 async function main() {
   // Start the Peril server and connect to the RabbitMQ server
@@ -10,9 +11,7 @@ async function main() {
   const connection = await amqp.connect(connectionString);
   const confirmChannel = await connection.createConfirmChannel();
   console.log(`Connection was successful!`);
-
-  // Publish a message to the exchange
-  publishJSON(confirmChannel, ExchangePerilDirect, PauseKey, { isPaused: true } satisfies PlayingState);
+  printServerHelp();
 
   // Handle SIGINT events for exit signal
   process.on('SIGINT', () => {
@@ -21,8 +20,32 @@ async function main() {
     process.exit(0);
   });
 
-  // Keep the process alive until exit by listening to stdin
-  process.stdin.resume();
+  // Interact with the user
+  while (true) {
+    const input = await getInput();
+    if (input.length === 0) continue;
+
+    // Check the first word
+    switch (input[0]) {
+      case `pause`:
+        console.log(`Sending a pause message.`);
+        // Publish a message to the exchange
+        publishJSON(confirmChannel, ExchangePerilDirect, PauseKey, { isPaused: true } satisfies PlayingState);
+        continue;
+      case `resume`:
+        console.log(`Sending a resume message.`);
+        // Publish a message to the exchange
+        publishJSON(confirmChannel, ExchangePerilDirect, PauseKey, { isPaused: false } satisfies PlayingState);
+        continue;
+      case `quit`:
+        console.log(`Exiting the program.`);
+        process.exit();
+      default:
+        console.log(`I don't understand the command.`);
+        printServerHelp();
+        continue;
+    }
+  }
 }
 
 main().catch((err) => {

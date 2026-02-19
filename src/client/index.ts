@@ -1,7 +1,10 @@
 import amqp from "amqplib";
-import { clientWelcome } from "../internal/gamelogic/gamelogic.js";
+import { clientWelcome, commandStatus, getInput, printClientHelp, printQuit } from "../internal/gamelogic/gamelogic.js";
 import { declareAndBind, SimpleQueueType } from "../internal/pubsub/declareAndBind.js";
 import { ExchangePerilDirect, PauseKey } from "../internal/routing/routing.js";
+import { GameState } from "../internal/gamelogic/gamestate.js";
+import { commandSpawn } from "../internal/gamelogic/spawn.js";
+import { commandMove } from "../internal/gamelogic/move.js";
 
 async function main() {
   // Start the Peril client and connect to the RabbitMQ server
@@ -20,6 +23,42 @@ async function main() {
     `${PauseKey}.${userName}`,
     PauseKey,
     SimpleQueueType.Transient);
+
+  const gameState: GameState = new GameState(userName);
+
+  // Interact with the user
+  while (true) {
+    const input = await getInput();
+    if (input.length === 0) continue;
+
+    // Check the first word
+    switch (input[0]) {
+      case `spawn`:
+        commandSpawn(gameState, input);
+        continue;
+      case `move`:
+        commandMove(gameState, input);
+        continue;
+      case `status`:
+        commandStatus(gameState);
+        continue;
+      case `help`:
+        printClientHelp();
+        continue;
+      case `spam`:
+        console.log(`Spamming not allowed yet!`);
+        continue;
+      case `quit`:
+        printQuit();
+        process.exit();
+      default:
+        console.log(`I didn't understand that command.`);
+        printClientHelp();
+        continue;
+    }
+
+    break;
+  }
 }
 
 main().catch((err) => {
