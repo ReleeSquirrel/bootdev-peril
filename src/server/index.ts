@@ -1,8 +1,9 @@
 import amqp from "amqplib";
 import { publishJSON } from "../internal/pubsub/publishJSON.js";
-import { ExchangePerilDirect, PauseKey } from "../internal/routing/routing.js";
+import { ExchangePerilDirect, ExchangePerilTopic, GameLogSlug, PauseKey } from "../internal/routing/routing.js";
 import type { PlayingState } from "../internal/gamelogic/gamestate.js";
 import { getInput, printServerHelp } from "../internal/gamelogic/gamelogic.js";
+import { declareAndBind, SimpleQueueType } from "../internal/pubsub/declareAndBind.js";
 
 async function main() {
   // Start the Peril server and connect to the RabbitMQ server
@@ -11,16 +12,24 @@ async function main() {
   const connection = await amqp.connect(connectionString);
   const confirmChannel = await connection.createConfirmChannel();
   console.log(`Connection was successful!`);
-  printServerHelp();
 
-  // Handle SIGINT events for exit signal
-  process.on('SIGINT', () => {
+  const gameLogsQueue = declareAndBind(connection, ExchangePerilTopic, GameLogSlug, `${GameLogSlug}.*`, SimpleQueueType.Durable);
+  
+
+  function exitProgram() {
     console.log(`Program is shutting down.`);
     connection.close();
     process.exit(0);
+  }
+
+  // Handle SIGINT events for exit signal
+  process.on('SIGINT', () => {
+    exitProgram();
   });
 
   // Interact with the user
+  printServerHelp();
+
   while (true) {
     const input = await getInput();
     if (input.length === 0) continue;
@@ -39,7 +48,7 @@ async function main() {
         continue;
       case `quit`:
         console.log(`Exiting the program.`);
-        process.exit();
+        exitProgram();
       default:
         console.log(`I don't understand the command.`);
         printServerHelp();

@@ -5,6 +5,8 @@ import { ExchangePerilDirect, PauseKey } from "../internal/routing/routing.js";
 import { GameState } from "../internal/gamelogic/gamestate.js";
 import { commandSpawn } from "../internal/gamelogic/spawn.js";
 import { commandMove } from "../internal/gamelogic/move.js";
+import { subscribeJSON } from "../internal/pubsub/subscribeJSON.js";
+import { handlerPause } from "./handlers.js";
 
 async function main() {
   // Start the Peril client and connect to the RabbitMQ server
@@ -26,6 +28,8 @@ async function main() {
 
   const gameState: GameState = new GameState(userName);
 
+  subscribeJSON(connection, ExchangePerilDirect, `${PauseKey}.${userName}`, PauseKey, SimpleQueueType.Transient, handlerPause(gameState));
+
   // Interact with the user
   while (true) {
     const input = await getInput();
@@ -34,13 +38,28 @@ async function main() {
     // Check the first word
     switch (input[0]) {
       case `spawn`:
-        commandSpawn(gameState, input);
+        try {
+          commandSpawn(gameState, input);
+        } catch (err) {
+          if (err instanceof Error) console.log(err.message);
+          else console.log(err);
+        }
         continue;
       case `move`:
-        commandMove(gameState, input);
+        try {
+          commandMove(gameState, input);
+        } catch (err) {
+          if (err instanceof Error) console.log(err.message);
+          else console.log(err);
+        }
         continue;
       case `status`:
-        commandStatus(gameState);
+        try {
+          commandStatus(gameState);
+        } catch (err) {
+          if (err instanceof Error) console.log(err.message);
+          else console.log(err);
+        }
         continue;
       case `help`:
         printClientHelp();
